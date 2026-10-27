@@ -666,8 +666,9 @@ class Agent:
         moment it's minted, before any I/O. `collect_artifacts` captures the task's
         declared artifacts after its finalizer while its container runtime is still
         alive. Retries whole while the trace ends with a retryable error
-        (`config.retries`) — never into a borrowed box; the final trace keeps earlier
-        attempts' errors."""
+        (`config.retries`) — never into a borrowed box, and never after an attempt
+        that spent model calls (a rerun would drop them, and their cost, from the
+        trace); the final trace keeps earlier attempts' errors."""
         if self._closed:
             raise RuntimeError("Agent is closed; create a new agent")
         retry = self.config.retries
@@ -683,6 +684,12 @@ class Agent:
                 logger.warning(
                     "not retrying the rollout on a borrowed box (its state is no "
                     "longer the task's start state); the error stands"
+                )
+                break
+            if any(call.node is not None or call.usage is not None for call in trace.calls):
+                logger.warning(
+                    "not retrying the rollout: the failed attempt already spent model "
+                    "calls, which a rerun would drop from the record; the error stands"
                 )
                 break
             cause = retry_state.next_error(trace.errors)
