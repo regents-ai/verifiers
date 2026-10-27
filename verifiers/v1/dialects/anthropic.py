@@ -506,11 +506,9 @@ class AnthropicDialect(Dialect[AnthropicMessage]):
         # The SDK sends the key as `x-api-key`; an ANTHROPIC_AUTH_TOKEN arrives as Bearer.
         return headers.get("x-api-key") or super().secret(headers)
 
-    def error_body(self, message: str) -> dict:
-        return {
-            "type": "error",
-            "error": {"type": "invalid_request_error", "message": message},
-        }
+    def error_body(self, message: str, *, status_code: int = 400) -> dict:
+        kind = "api_error" if status_code >= 500 else "invalid_request_error"
+        return {"type": "error", "error": {"type": kind, "message": message}}
 
     def stream_keepalive(self, first: bool) -> bytes:
         # Anthropic's own keepalive; its SDKs skip it anywhere in the stream.

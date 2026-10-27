@@ -307,9 +307,11 @@ class Dialect(ABC, Generic[RespT]):
         client ends on an earlier event (e.g. Responses' `response.completed`) overrides this."""
         return is_sse_done_event(chunk)
 
-    def error_body(self, message: str) -> dict:
-        """An error payload in this format's error shape (OpenAI by default)."""
-        return {"error": {"message": message, "type": "invalid_request_error"}}
+    def error_body(self, message: str, *, status_code: int = 400) -> dict:
+        """An error payload in this format's error shape (OpenAI by default). A 5xx is a
+        `server_error`, so clients retry it rather than read it as a malformed request."""
+        kind = "server_error" if status_code >= 500 else "invalid_request_error"
+        return {"error": {"message": message, "type": kind}}
 
     def stream_keepalive(self, first: bool) -> bytes:
         """A keepalive for a committed SSE stream whose turn is still being produced (`first`
